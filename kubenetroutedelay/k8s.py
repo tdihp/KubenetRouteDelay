@@ -4,8 +4,10 @@ All stuff interacting with Kubernetes
 from datetime import datetime
 import logging
 from collections import namedtuple
-from functools import partial
+import socket
+
 from dateutil.tz import tzutc
+from urllib3.connection import HTTPConnection
 
 from kubernetes import client, watch
 
@@ -153,6 +155,18 @@ class TaintAndConditionUpdater(NodeUpdater):
         logger.info('update node done')
 
 
+class ConditionUpdater(NodeUpdater):
+    def __init__(self, condition_manager):
+        self.condition_manager = condition_manager
+    
+    def update(self, node):
+        condition_status_same = self.condition_manager.condition_status_equals(node)
+        if condition_status_same is None or not condition_status_same:
+            logger.info('set condition for node %s', node_name)
+            self.condition_manager.set_condition(node)
+            logger.info('condition set done')
+
+
 def node_watch_loop(
         # pool,
         node_updater,
@@ -160,6 +174,15 @@ def node_watch_loop(
         triggered_events = ('ADDED', 'MODIFIED'),
         ):
     v1 = client.CoreV1Api()
+    # hack: keep alive https://github.com/kubernetes-client/python/issues/1234#issuecomment-695801558
+    socket_options = HTTPConnection.default_socket_options + [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+        (socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 5),
+        (socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 30),
+        (socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3),
+    ]
+    v1.api_client.rest_client.pool_manager.connection_pool_kw['socket_options'] = socket_options
+
     watcher = watch.Watch()
     for event in watcher.stream(v1.list_node, label_selector=label_selector):
         event_type = event['type']
@@ -169,7 +192,9 @@ def node_watch_loop(
         if event_type in triggered_events:
             logger.info('update node %s', node_name)
             node_updater.update(node)
-            
+
+    logger.info('watch loop finished')
+
 
 def set_condition_by_node_name(node_name, condition_manager):
     v1 = client.CoreV1Api()

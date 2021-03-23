@@ -69,7 +69,7 @@ spec:
         agentpool: foobar
       containers:
       - name: probe
-        image: tdihp/lab:kubenetroutedelaymk4
+        image: tdihp/kubenetroutedelay:latest
         args: ["probe", "-n", "$(NODE_NAME)"]
         resources:
             requests:
@@ -114,8 +114,8 @@ spec:
         kubernetes.azure.com/mode: system
       containers:
       - name: probe
-        image: tdihp/lab:kubenetroutedelaymk4
-        args: ["watcher", "-s", "agentpool=foobar"]
+        image: tdihp/kubenetroutedelay:latest
+        args: ["watcher", "-s", "agentpool=foobar"]  # suppose we are to update the "foobar" agentpool
         resources:
             requests:
               cpu: 100m

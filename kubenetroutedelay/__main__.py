@@ -17,12 +17,23 @@ logger = logging.getLogger('kubenetroutedelay')
 
 
 def watcher(node_selector):
-    taint_manager = TaintManager(key='kubenetroutedelay', value='yes', effect='NoSchedule')
-    condition_manager = ConditionManager(type='KubenetRouteDelay', status='True', reason='PendingDelay', message='pending daemonset update')
+    logger.info('initializing watcher')
+    taint_manager = TaintManager(
+        key='kubenetroutedelay',
+        value='yes',
+        effect='NoSchedule')
+
+    condition_manager = ConditionManager(
+        type='KubenetRouteDelay',
+        status='True',
+        reason='PendingDelay',
+        message='pending daemonset update')
+
     node_updater = TaintAndConditionUpdater(
         taint_manager=taint_manager,
         condition_manager=condition_manager,
     )
+    logger.info('starting the watch loop')
     node_watch_loop(node_updater, node_selector)
 
 
